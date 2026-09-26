@@ -50,7 +50,7 @@ class _FakeAgent:
         self.outputs = list(outputs)
         self.calls = 0
 
-    async def ainvoke(self, request):
+    async def ainvoke(self, request, config=None):
         self.calls += 1
         return self.outputs.pop(0)
 
