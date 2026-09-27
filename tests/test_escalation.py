@@ -91,7 +91,58 @@ def test_no_pause_when_rule_does_not_fire(monkeypatch):
     assert executed == [] and decision == DECISION
 
 
+def test_repeated_escalation_requests_are_capped(monkeypatch):
+    """A model that keeps re-requesting escalation after rejection must not hang triage()
+    forever -- it should give up after MAX_ESCALATION_ROUNDS."""
+
+    @tool
+    def get_ticket(ticket_id: str) -> dict:
+        """Get a ticket."""
+        return {"customer_id": "C-1"}
+
+    @tool
+    def get_customer_history(customer_id: str) -> dict:
+        """Get a customer."""
+        return {"plan": "Enterprise"}
+
+    executed = []
+
+    @tool
+    def escalate_to_human(ticket_id: str, reason: str) -> str:
+        """Escalate."""
+        executed.append(ticket_id)
+        return "escalated"
+
+    class _Client:
+        def __init__(self, *_):
+            pass
+
+        async def get_tools(self):
+            return [get_ticket, get_customer_history]
+
+    calls = [
+        {"name": "get_ticket", "args": {"ticket_id": "T-1044"}, "id": "c1"},
+        {"name": "get_customer_history", "args": {"customer_id": "C-1"}, "id": "c2"},
+        *([ESCALATE] * (agent.MAX_ESCALATION_ROUNDS + 1)),
+        {"name": "TriageDecision", "args": DECISION, "id": "cN"},
+    ]
+    monkeypatch.setattr(agent, "MultiServerMCPClient", _Client)
+    monkeypatch.setattr(agent, "escalate_to_human", escalate_to_human)
+    monkeypatch.setattr(agent, "build_model", lambda: ScriptedModel(calls=calls))
+
+    with pytest.raises(RuntimeError, match="not resolved"):
+        asyncio.run(agent.triage("T-1044", lambda action: False))
+
+
 def test_default_approver_only_yes_counts(monkeypatch):
-    for answer, expected in [("yes", True), ("Y", True), ("no", False), ("", False), ("maybe", False)]:
+    for answer, expected in [("yes", True), ("YES", True), ("y", False), ("no", False), ("", False), ("maybe", False)]:
         monkeypatch.setattr("builtins.input", lambda _prompt, a=answer: a)
         assert agent.ask_in_terminal({"args": {"ticket_id": "T-1", "reason": "r"}}) is expected
+
+
+def test_default_approver_handles_no_terminal_input(monkeypatch):
+    def _raise_eof(_prompt):
+        raise EOFError
+
+    monkeypatch.setattr("builtins.input", _raise_eof)
+    assert agent.ask_in_terminal({"args": {"ticket_id": "T-1", "reason": "r"}}) is False
