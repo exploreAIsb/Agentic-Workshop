@@ -1,7 +1,8 @@
 import csv
+import importlib.util
 import sqlite3
 
-from load_seed import SEED_DIR, load
+from load_seed import DB_PATH, ROOT, SEED_DIR, load
 
 
 def _dump(db):
@@ -51,3 +52,12 @@ def test_seed_files_untouched(tmp_path):
     before = {p.name: p.read_bytes() for p in SEED_DIR.glob("*.csv")}
     load(tmp_path / "app.db")
     assert {p.name: p.read_bytes() for p in SEED_DIR.glob("*.csv")} == before
+
+
+def test_default_db_path_matches_triage_server():
+    """load_seed and mcp/triage_server must agree on where app.db lives, or the
+    loader can silently populate a file the triage agent never reads."""
+    spec = importlib.util.spec_from_file_location("triage_server", ROOT / "mcp" / "triage_server.py")
+    triage_server = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(triage_server)
+    assert DB_PATH == triage_server.DB_PATH
