@@ -50,7 +50,7 @@ class _FakeAgent:
         self.outputs = list(outputs)
         self.calls = 0
 
-    async def ainvoke(self, request):
+    async def ainvoke(self, request, config=None):
         self.calls += 1
         return self.outputs.pop(0)
 
@@ -128,6 +128,6 @@ def test_agent_wiring(monkeypatch):
 
     kwargs = captured["create_agent_kwargs"]
     assert kwargs["system_prompt"] == agent.INSTRUCTIONS
-    assert kwargs["tools"] == []
+    assert kwargs["tools"] == [agent.escalate_to_human]
     assert isinstance(kwargs["response_format"], ToolStrategy)
     assert kwargs["response_format"].schema_specs[0].schema is TriageDecision
