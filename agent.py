@@ -33,15 +33,21 @@ def build_model():
     """Gemini by default; PROVIDER=groq switches to Groq. No code change needed."""
     provider = os.environ.get("PROVIDER", "gemini").lower()
     if provider not in DEFAULT_MODELS:
-        raise SystemExit(f"Unknown PROVIDER '{provider}'. Use 'gemini' or 'groq'.")
+        raise ValueError(f"Unknown PROVIDER '{provider}'. Use 'gemini' or 'groq'.")
     model = os.environ.get("MODEL") or DEFAULT_MODELS[provider]
     if provider == "groq":
         from langchain_groq import ChatGroq
 
-        return ChatGroq(model=model, api_key=os.environ.get("GROQ_API_KEY"))
+        api_key = os.environ.get("GROQ_API_KEY")
+        if not api_key:
+            raise ValueError("GROQ_API_KEY is not set.")
+        return ChatGroq(model=model, api_key=api_key)
     from langchain_google_genai import ChatGoogleGenerativeAI
 
-    return ChatGoogleGenerativeAI(model=model, api_key=os.environ.get("GEMINI_API_KEY"))
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise ValueError("GEMINI_API_KEY is not set.")
+    return ChatGoogleGenerativeAI(model=model, api_key=api_key)
 
 
 async def triage(ticket_id: str) -> dict:
