@@ -128,6 +128,6 @@ def test_agent_wiring(monkeypatch):
 
     kwargs = captured["create_agent_kwargs"]
     assert kwargs["system_prompt"] == agent.INSTRUCTIONS
-    assert kwargs["tools"] == []
+    assert kwargs["tools"] == [agent.escalate_to_human]
     assert isinstance(kwargs["response_format"], ToolStrategy)
     assert kwargs["response_format"].schema_specs[0].schema is TriageDecision
